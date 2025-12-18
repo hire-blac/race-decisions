@@ -1,3 +1,4 @@
+export const runtime = "nodejs";
 import { generateDecisionPDF } from "@/lib/pdf";
 import { NextResponse } from "next/server";
 

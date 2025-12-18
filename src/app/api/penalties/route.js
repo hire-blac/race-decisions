@@ -1,3 +1,4 @@
+export const runtime = "nodejs";
 import { prisma } from "@/lib/prisma";
 import STRAFENKATALOG from "@/lib/strafenkatalog";
 import { NextResponse } from "next/server";

@@ -1,7 +1,8 @@
 import { createReport } from 'docx-templates';
-import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { spawn } from 'child_process';
+import { tmpdir } from 'os';
 
 /**
  * DOCX-based PDF Generator for Race Decisions
@@ -13,8 +14,9 @@ import { spawn } from 'child_process';
  */
 export class DocxPdfGenerator {
   static TEMPLATE_PATH = join(process.cwd(), 'templates', 'decision_template.docx');
-  static TEMP_DIR = join(process.cwd(), 'temp');
-  static OUTPUT_DIR = join(process.cwd(), 'public', 'pdfs', 'decisions');
+  // Use /tmp for serverless environments (Vercel, AWS Lambda, etc.)
+  static TEMP_DIR = join(tmpdir(), 'race-decision-temp');
+  static OUTPUT_DIR = join(tmpdir(), 'race-decision-output');
 
   /**
    * Generate a Decision PDF
@@ -34,6 +36,9 @@ export class DocxPdfGenerator {
    */
   static async generateDecisionPDF(data, outputFilename) {
     try {
+      // Ensure temp and output directories exist
+      this.ensureDirectoriesExist();
+
       // Validate template exists
       if (!existsSync(this.TEMPLATE_PATH)) {
         throw new Error(`Template not found at: ${this.TEMPLATE_PATH}`);
@@ -152,6 +157,19 @@ export class DocxPdfGenerator {
       'sprint': 'Sprint',
     };
     return eventMap[event?.toLowerCase()] || event || 'Race';
+  }
+
+  /**
+   * Ensure temp and output directories exist
+   * @private
+   */
+  static ensureDirectoriesExist() {
+    if (!existsSync(this.TEMP_DIR)) {
+      mkdirSync(this.TEMP_DIR, { recursive: true });
+    }
+    if (!existsSync(this.OUTPUT_DIR)) {
+      mkdirSync(this.OUTPUT_DIR, { recursive: true });
+    }
   }
 
   /**

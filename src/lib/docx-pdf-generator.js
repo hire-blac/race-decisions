@@ -1,25 +1,15 @@
-import { createReport } from 'docx-templates';
-import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from 'fs';
-import { join } from 'path';
-import { spawn } from 'child_process';
-import { tmpdir } from 'os';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 /**
- * DOCX-based PDF Generator for Race Decisions
+ * PDF Generator for Race Decisions using pdf-lib
  *
  * This class generates professional PDF documents using:
- * 1. DOCX templates with placeholders
- * 2. docx-templates library to fill data
- * 3. LibreOffice headless mode to convert DOCX → PDF
+ * - pdf-lib for direct PDF creation (no external dependencies)
+ * - Works perfectly in serverless environments (Vercel, AWS Lambda, etc.)
  */
 export class DocxPdfGenerator {
-  static TEMPLATE_PATH = join(process.cwd(), 'templates', 'decision_template.docx');
-  // Use /tmp for serverless environments (Vercel, AWS Lambda, etc.)
-  static TEMP_DIR = join(tmpdir(), 'race-decision-temp');
-  static OUTPUT_DIR = join(tmpdir(), 'race-decision-output');
-
   /**
-   * Generate a Decision PDF
+   * Generate a Decision PDF and return as Buffer
    * @param {Object} data - Decision data
    * @param {string} data.driverName - Driver name
    * @param {number} data.carNumber - Car number
@@ -31,80 +21,237 @@ export class DocxPdfGenerator {
    * @param {string} data.penalty - Penalty description
    * @param {boolean} data.discretionary - Is penalty discretionary
    * @param {string} data.createdAt - Date/time of decision
-   * @param {string} outputFilename - Filename for the PDF (without extension)
-   * @returns {Promise<{pdfPath: string, docxPath: string}>} Paths to generated files
-   */
-  static async generateDecisionPDF(data, outputFilename) {
-    try {
-      // Ensure temp and output directories exist
-      this.ensureDirectoriesExist();
-
-      // Validate template exists
-      if (!existsSync(this.TEMPLATE_PATH)) {
-        throw new Error(`Template not found at: ${this.TEMPLATE_PATH}`);
-      }
-
-      // Prepare data for template
-      const templateData = this.prepareTemplateData(data);
-
-      // Read DOCX template
-      const template = readFileSync(this.TEMPLATE_PATH);
-
-      // Fill template with data
-      console.log('Filling DOCX template with data...');
-      const filledDocx = await createReport({
-        template,
-        data: templateData,
-        cmdDelimiter: ['{{', '}}'],
-        processLineBreaks: true,
-      });
-
-      // Save filled DOCX to temp directory
-      const tempDocxPath = join(this.TEMP_DIR, `${outputFilename}.docx`);
-      writeFileSync(tempDocxPath, filledDocx);
-      console.log(`Temporary DOCX created: ${tempDocxPath}`);
-
-      // Convert DOCX to PDF using LibreOffice
-      console.log('Converting DOCX to PDF...');
-      await this.convertDocxToPdf(tempDocxPath, this.OUTPUT_DIR);
-
-      const pdfPath = join(this.OUTPUT_DIR, `${outputFilename}.pdf`);
-      console.log(`PDF generated successfully: ${pdfPath}`);
-
-      return {
-        pdfPath: `/pdfs/decisions/${outputFilename}.pdf`,
-        docxPath: tempDocxPath,
-      };
-    } catch (error) {
-      console.error('PDF generation failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Generate a Decision PDF and return as Buffer (for immediate download)
-   * @param {Object} data - Decision data
    * @returns {Promise<Buffer>} PDF as Buffer
    */
   static async generateDecisionPDFBuffer(data) {
-    const timestamp = Date.now();
-    const filename = `decision_${timestamp}`;
+    // Prepare template data
+    const templateData = this.prepareTemplateData(data);
 
-    const result = await this.generateDecisionPDF(data, filename);
+    // Create a new PDF document
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([595.28, 841.89]); // A4 size in points
+    const { width, height } = page.getSize();
 
-    // Read the generated PDF
-    const pdfPath = join(this.OUTPUT_DIR, `${filename}.pdf`);
-    const pdfBuffer = readFileSync(pdfPath);
+    // Embed fonts
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const italicFont = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
 
-    // Clean up temp files
-    try {
-      if (existsSync(result.docxPath)) unlinkSync(result.docxPath);
-      if (existsSync(pdfPath)) unlinkSync(pdfPath);
-    } catch (error) {
-      console.warn('Could not delete temp files:', error);
+    let yPosition = height - 60;
+    const leftMargin = 50;
+    const rightMargin = width - 50;
+    const contentWidth = rightMargin - leftMargin;
+
+    // Title: "STEWARDS DECISION"
+    const titleText = 'STEWARDS DECISION';
+    const titleSize = 24;
+    const titleWidth = boldFont.widthOfTextAtSize(titleText, titleSize);
+    page.drawText(titleText, {
+      x: (width - titleWidth) / 2,
+      y: yPosition,
+      size: titleSize,
+      font: boldFont,
+      color: rgb(0, 0, 0),
+    });
+    yPosition -= 50;
+
+    // Decision Details Table
+    const drawTableRow = (label, value, y) => {
+      const labelX = leftMargin + 10;
+      const valueX = leftMargin + 150;
+      const rowHeight = 20;
+
+      // Draw row background (alternating for visual clarity)
+      page.drawRectangle({
+        x: leftMargin,
+        y: y - 15,
+        width: contentWidth,
+        height: rowHeight,
+        borderColor: rgb(0.7, 0.7, 0.7),
+        borderWidth: 0.5,
+      });
+
+      // Draw label
+      page.drawText(label, {
+        x: labelX,
+        y: y,
+        size: 11,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+
+      // Draw value (wrap if needed)
+      const maxValueWidth = contentWidth - 160;
+      const wrappedValue = this.wrapText(value, regularFont, 11, maxValueWidth);
+      page.drawText(wrappedValue, {
+        x: valueX,
+        y: y,
+        size: 11,
+        font: regularFont,
+        color: rgb(0, 0, 0),
+      });
+
+      return y - rowHeight;
+    };
+
+    // Table header
+    page.drawRectangle({
+      x: leftMargin,
+      y: yPosition - 15,
+      width: contentWidth,
+      height: 20,
+      color: rgb(0.9, 0.9, 0.9),
+      borderColor: rgb(0.7, 0.7, 0.7),
+      borderWidth: 0.5,
+    });
+    page.drawText('DECISION DETAILS', {
+      x: leftMargin + 10,
+      y: yPosition,
+      size: 12,
+      font: boldFont,
+      color: rgb(0, 0, 0),
+    });
+    yPosition -= 20;
+
+    // Table rows
+    yPosition = drawTableRow('Driver:', templateData.driverName, yPosition);
+    yPosition = drawTableRow('Car Number:', templateData.carNumber, yPosition);
+    yPosition = drawTableRow('Team:', templateData.teamName, yPosition);
+    yPosition = drawTableRow('Event:', templateData.eventType, yPosition);
+    yPosition = drawTableRow('Track:', templateData.trackName, yPosition);
+    yPosition = drawTableRow('Competition:', templateData.competitionName, yPosition);
+
+    yPosition -= 30;
+
+    // INCIDENT DETAILS Section
+    page.drawText('INCIDENT DETAILS', {
+      x: leftMargin,
+      y: yPosition,
+      size: 14,
+      font: boldFont,
+      color: rgb(0, 0, 0),
+    });
+    yPosition -= 25;
+
+    page.drawText('Cause:', {
+      x: leftMargin,
+      y: yPosition,
+      size: 11,
+      font: boldFont,
+      color: rgb(0, 0, 0),
+    });
+    yPosition -= 20;
+
+    // Wrap cause text
+    const causeLines = this.wrapTextMultiline(templateData.cause, regularFont, 11, contentWidth);
+    for (const line of causeLines) {
+      page.drawText(line, {
+        x: leftMargin,
+        y: yPosition,
+        size: 11,
+        font: regularFont,
+        color: rgb(0, 0, 0),
+      });
+      yPosition -= 15;
     }
 
-    return pdfBuffer;
+    yPosition -= 20;
+
+    // PENALTY Section
+    page.drawText('PENALTY', {
+      x: leftMargin,
+      y: yPosition,
+      size: 14,
+      font: boldFont,
+      color: rgb(0, 0, 0),
+    });
+    yPosition -= 25;
+
+    page.drawText('Penalty Imposed:', {
+      x: leftMargin,
+      y: yPosition,
+      size: 11,
+      font: boldFont,
+      color: rgb(0, 0, 0),
+    });
+    yPosition -= 20;
+
+    // Wrap penalty text
+    const penaltyLines = this.wrapTextMultiline(templateData.penalty, regularFont, 11, contentWidth);
+    for (const line of penaltyLines) {
+      page.drawText(line, {
+        x: leftMargin,
+        y: yPosition,
+        size: 11,
+        font: regularFont,
+        color: rgb(0, 0, 0),
+      });
+      yPosition -= 15;
+    }
+
+    yPosition -= 10;
+
+    // Discretionary Penalty
+    const discretionaryText = `Discretionary Penalty: ${templateData.discretionary}`;
+    page.drawText(discretionaryText, {
+      x: leftMargin,
+      y: yPosition,
+      size: 11,
+      font: regularFont,
+      color: rgb(0, 0, 0),
+    });
+    yPosition -= 40;
+
+    // Footer - Signature Line
+    const signatureLine = '_'.repeat(50);
+    const signatureLineWidth = regularFont.widthOfTextAtSize(signatureLine, 11);
+    page.drawText(signatureLine, {
+      x: (width - signatureLineWidth) / 2,
+      y: yPosition,
+      size: 11,
+      font: regularFont,
+      color: rgb(0, 0, 0),
+    });
+    yPosition -= 20;
+
+    // Stewards Signature
+    const signatureText = 'Stewards Signature';
+    const signatureTextWidth = italicFont.widthOfTextAtSize(signatureText, 11);
+    page.drawText(signatureText, {
+      x: (width - signatureTextWidth) / 2,
+      y: yPosition,
+      size: 11,
+      font: italicFont,
+      color: rgb(0, 0, 0),
+    });
+    yPosition -= 30;
+
+    // Date & Time
+    const dateTimeText = `Date & Time: ${templateData.createdAt}`;
+    const dateTimeWidth = regularFont.widthOfTextAtSize(dateTimeText, 11);
+    page.drawText(dateTimeText, {
+      x: (width - dateTimeWidth) / 2,
+      y: yPosition,
+      size: 11,
+      font: regularFont,
+      color: rgb(0, 0, 0),
+    });
+
+    // Serialize the PDF to bytes
+    const pdfBytes = await pdfDoc.save();
+    return Buffer.from(pdfBytes);
+  }
+
+  /**
+   * Legacy method for compatibility - now just calls generateDecisionPDFBuffer
+   * @deprecated Use generateDecisionPDFBuffer instead
+   */
+  static async generateDecisionPDF(data, outputFilename) {
+    const buffer = await this.generateDecisionPDFBuffer(data);
+    return {
+      pdfPath: `/pdfs/decisions/${outputFilename}.pdf`,
+      docxPath: null, // No DOCX in pdf-lib approach
+    };
   }
 
   /**
@@ -140,7 +287,6 @@ export class DocxPdfGenerator {
       penalty: data.penalty || 'N/A',
       discretionary: data.discretionary ? 'Yes' : 'No',
       createdAt: createdDate,
-      // Additional computed fields
       eventType: this.formatEventType(data.event),
     };
   }
@@ -160,60 +306,6 @@ export class DocxPdfGenerator {
   }
 
   /**
-   * Ensure temp and output directories exist
-   * @private
-   */
-  static ensureDirectoriesExist() {
-    if (!existsSync(this.TEMP_DIR)) {
-      mkdirSync(this.TEMP_DIR, { recursive: true });
-    }
-    if (!existsSync(this.OUTPUT_DIR)) {
-      mkdirSync(this.OUTPUT_DIR, { recursive: true });
-    }
-  }
-
-  /**
-   * Convert DOCX to PDF using LibreOffice headless
-   * @private
-   */
-  static convertDocxToPdf(docxPath, outputDir) {
-    return new Promise((resolve, reject) => {
-      const process = spawn('libreoffice', [
-        '--headless',
-        '--convert-to', 'pdf',
-        '--outdir', outputDir,
-        docxPath,
-      ]);
-
-      let stderr = '';
-
-      process.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      process.on('close', (code) => {
-        if (code === 0) {
-          resolve();
-        } else {
-          reject(new Error(`PDF conversion failed with code ${code}: ${stderr}`));
-        }
-      });
-
-      process.on('error', (error) => {
-        reject(new Error(`Failed to start LibreOffice: ${error.message}`));
-      });
-
-      // 60 second timeout
-      const timeout = setTimeout(() => {
-        process.kill();
-        reject(new Error('PDF conversion timed out after 60 seconds'));
-      }, 60000);
-
-      process.on('close', () => clearTimeout(timeout));
-    });
-  }
-
-  /**
    * Helper: Generate filename from decision data
    * @param {Object} data - Decision data
    * @returns {string} Sanitized filename
@@ -225,19 +317,53 @@ export class DocxPdfGenerator {
     const timestamp = Date.now();
     return `decision_${driverName}_${timestamp}`;
   }
-}
 
-/**
- * Data interface for Decision PDF
- * @typedef {Object} DecisionPDFData
- * @property {string} driverName - Driver name
- * @property {number} carNumber - Car number
- * @property {string} teamName - Team name
- * @property {string} event - Event type (race/qualifying/practice)
- * @property {string} trackName - Track/circuit name
- * @property {string} competitionName - Competition/championship name
- * @property {string} cause - Cause/incident description
- * @property {string} penalty - Penalty description
- * @property {boolean} discretionary - Is penalty discretionary
- * @property {string} createdAt - Date/time of decision
- */
+  /**
+   * Wrap text to fit within a max width (single line)
+   * @private
+   */
+  static wrapText(text, font, size, maxWidth) {
+    const words = text.split(' ');
+    let line = '';
+
+    for (const word of words) {
+      const testLine = line + (line ? ' ' : '') + word;
+      const testWidth = font.widthOfTextAtSize(testLine, size);
+
+      if (testWidth > maxWidth && line) {
+        return line + '...';
+      }
+      line = testLine;
+    }
+
+    return line;
+  }
+
+  /**
+   * Wrap text to fit within a max width (multiple lines)
+   * @private
+   */
+  static wrapTextMultiline(text, font, size, maxWidth) {
+    const words = text.split(' ');
+    const lines = [];
+    let currentLine = '';
+
+    for (const word of words) {
+      const testLine = currentLine + (currentLine ? ' ' : '') + word;
+      const testWidth = font.widthOfTextAtSize(testLine, size);
+
+      if (testWidth > maxWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = testLine;
+      }
+    }
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+
+    return lines;
+  }
+}

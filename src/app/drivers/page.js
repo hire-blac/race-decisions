@@ -61,7 +61,7 @@ export default function DriversPage() {
           />
           <input
             type="number"
-            placeholder="Car # (optional)"
+            placeholder="Car Number (optional)"
             value={carNumber}
             onChange={e => setCarNumber(e.target.value)}
             className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base shadow-sm"

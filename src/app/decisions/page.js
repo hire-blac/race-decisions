@@ -9,6 +9,8 @@ export default function DecisionsPage() {
   const [customCause, setCustomCause] = useState("");
   const [penalty, setPenalty] = useState("");
   const [event, setEvent] = useState("race");
+  const [trackName, setTrackName] = useState("");
+  const [competitionName, setCompetitionName] = useState("");
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedCatalogEntry, setSelectedCatalogEntry] = useState(null);
   const [existingPenalties, setExistingPenalties] = useState([]);
@@ -67,13 +69,13 @@ export default function DecisionsPage() {
     const finalCause = cause === "Other" ? customCause : cause;
 
     if (!driverId || !finalCause || !penalty) {
-      alert("Please fill in all fields");
+      alert("Please fill in all required fields");
       return;
     }
 
     await fetch("/api/penalties", {
       method: "POST",
-      body: JSON.stringify({ driverId, cause: finalCause, penalty, event }),
+      body: JSON.stringify({ driverId, cause: finalCause, penalty, event, trackName, competitionName }),
     });
 
     const driver = drivers.find(d => d.id === driverId);
@@ -82,9 +84,14 @@ export default function DecisionsPage() {
       method: "POST",
       body: JSON.stringify({
         Driver: driver.name,
+        carNumber: driver.carNumber,
         Team: driver.team.name,
         Cause: finalCause,
         Penalty: penalty,
+        event: event,
+        trackName: trackName,
+        competitionName: competitionName,
+        discretionary: isDiscretionary,
       }),
     });
 
@@ -100,6 +107,23 @@ export default function DecisionsPage() {
 
       <div className="bg-white rounded-lg shadow-md border border-gray-200 p-8 mb-6">
         <div className="space-y-6">
+
+          {/* Competition Name */}
+          <div>
+            <label htmlFor="competitionName" className="block text-sm font-semibold text-gray-700 mb-2">
+              Competition Name
+              <span className="text-gray-400 font-normal ml-1">(Optional)</span>
+            </label>
+            <input
+              id="competitionName"
+              type="text"
+              value={competitionName}
+              onChange={(e) => setCompetitionName(e.target.value)}
+              placeholder="e.g., Formula 1 World Championship, F2 Sprint Series"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base shadow-sm"
+            />
+          </div>
+          
           {/* Driver Selection */}
           <div>
             <label htmlFor="driver" className="block text-sm font-semibold text-gray-700 mb-2">
@@ -135,6 +159,22 @@ export default function DecisionsPage() {
               <option value="qualifying">Qualifying</option>
               <option value="training">Training</option>
             </select>
+          </div>
+
+          {/* Track Name */}
+          <div>
+            <label htmlFor="trackName" className="block text-sm font-semibold text-gray-700 mb-2">
+              Track Name
+              <span className="text-gray-400 font-normal ml-1">(Optional)</span>
+            </label>
+            <input
+              id="trackName"
+              type="text"
+              value={trackName}
+              onChange={(e) => setTrackName(e.target.value)}
+              placeholder="e.g., Monza, Silverstone, Spa-Francorchamps"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base shadow-sm"
+            />
           </div>
 
           {/* Cause Selection */}

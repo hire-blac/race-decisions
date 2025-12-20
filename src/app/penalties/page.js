@@ -23,15 +23,22 @@ export default function PenaltiesPage() {
         method: "POST",
         body: JSON.stringify({
           Driver: penalty.driver.name,
+          carNumber: penalty.driver.carNumber,
           Team: penalty.driver.team.name,
+          event: penalty.event,
+          trackName: penalty.trackName,
+          competitionName: penalty.competitionName,
           Cause: penalty.cause,
           Penalty: penalty.penalty,
+          discretionary: penalty.discretionary,
         }),
       });
 
       if (res.ok) {
         const blob = await res.blob();
         window.open(URL.createObjectURL(blob));
+      } else {
+        throw new Error("Failed to generate PDF");
       }
     } catch (error) {
       console.error("Error generating PDF:", error);
@@ -85,6 +92,7 @@ export default function PenaltiesPage() {
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Driver</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Team</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Event</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Track</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Infringement</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Penalty</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Type</th>
@@ -99,6 +107,9 @@ export default function PenaltiesPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-semibold text-gray-900">{penalty.driver.name}</div>
+                      {penalty.driver.carNumber && (
+                        <div className="text-xs text-gray-500">#{penalty.driver.carNumber}</div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {penalty.driver.team.name}
@@ -111,6 +122,9 @@ export default function PenaltiesPage() {
                       }`}>
                         {penalty.event.charAt(0).toUpperCase() + penalty.event.slice(1)}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {penalty.trackName || '-'}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900 max-w-xs">
                       {penalty.cause}

@@ -4,7 +4,7 @@ import STRAFENKATALOG from "@/lib/strafenkatalog";
 import { NextResponse } from "next/server";
 
 export async function POST(req) {
-  const { driverId, cause, penalty, event = "race" } = await req.json();
+  const { driverId, cause, penalty, event = "race", trackName, competitionName } = await req.json();
 
   const predefined = STRAFENKATALOG.find(c => c.cause === cause);
 
@@ -14,6 +14,8 @@ export async function POST(req) {
       cause,
       penalty: predefined ? predefined.penalty[event] : penalty,
       event,
+      trackName: trackName || null,
+      competitionName: competitionName || null,
       discretionary: !predefined,
     },
   });

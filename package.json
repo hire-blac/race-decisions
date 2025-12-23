@@ -17,7 +17,6 @@
     "docx-templates": "^4.14.1",
     "next": "16.0.10",
     "pdf-lib": "^1.17.1",
-    "prisma": "^6.19.1",
     "react": "19.2.1",
     "react-dom": "19.2.1",
     "uuid": "^13.0.0"
@@ -28,5 +27,8 @@
     "eslint-config-next": "16.0.10",
     "prisma": "^6.19.1",
     "tailwindcss": "^4"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

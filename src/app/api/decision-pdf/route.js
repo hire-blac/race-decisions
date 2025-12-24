@@ -10,7 +10,7 @@ export async function POST(req) {
     const pdfData = {
       driverName: body.Driver || body.driverName || 'N/A',
       carNumber: body.carNumber || body.CarNumber,
-      teamName: body.Team || body.teamName || 'N/A',
+      teamName: body.Team || body.teamName || '',
       event: body.event || body.Event || 'race',
       trackName: body.trackName || body.TrackName,
       competitionName: body.competitionName || body.CompetitionName,

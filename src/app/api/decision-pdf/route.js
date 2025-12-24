@@ -9,7 +9,7 @@ export async function POST(req) {
     // Prepare data for DOCX PDF generator
     const pdfData = {
       driverName: body.Driver || body.driverName || 'N/A',
-      carNumber: body.carNumber || body.CarNumber,
+      carNumber: body.carNumber || body.CarNumber || '',
       teamName: body.Team || body.teamName || '',
       event: body.event || body.Event || 'race',
       trackName: body.trackName || body.TrackName,

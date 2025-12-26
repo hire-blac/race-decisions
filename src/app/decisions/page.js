@@ -129,7 +129,7 @@ export default function DecisionsPage() {
             {/* Driver Selection */}
             <div>
               <label htmlFor="driver" className="block text-sm font-semibold text-gray-700 mb-2">
-                Driver
+                Fahrer
               </label>
               <select
                 id="driver"
@@ -166,7 +166,7 @@ export default function DecisionsPage() {
             {/* Track Name */}
             <div>
               <label htmlFor="trackName" className="block text-sm font-semibold text-gray-700 mb-2">
-                Track Name
+                Strecke
                 <span className="text-gray-400 font-normal ml-1">(Optional)</span>
               </label>
               <input
@@ -174,7 +174,7 @@ export default function DecisionsPage() {
                 type="text"
                 value={trackName}
                 onChange={(e) => setTrackName(e.target.value)}
-                placeholder="e.g., Monza, Silverstone"
+                placeholder="e.g., Hockenheim, Nürburgring"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base shadow-sm"
               />
             </div>
@@ -279,7 +279,7 @@ export default function DecisionsPage() {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Decision Preview</h2>
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <dt className="text-sm font-medium text-gray-600">Driver</dt>
+              <dt className="text-sm font-medium text-gray-600">Fahrer</dt>
               <dd className="mt-1 text-base font-semibold text-gray-900">{selectedDriver.name}</dd>
             </div>
             <div>

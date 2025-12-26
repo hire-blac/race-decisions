@@ -14,7 +14,7 @@ export default function PenaltiesPage() {
   }
 
   function formatDate(dateString) {
-    return new Date(dateString).toLocaleString();
+    return new Date(dateString).toLocaleDateString();
   }
 
   async function generatePDF(penalty) {
@@ -88,7 +88,7 @@ export default function PenaltiesPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date & Time</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Driver</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Team</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Event</th>

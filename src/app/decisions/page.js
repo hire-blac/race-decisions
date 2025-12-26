@@ -101,7 +101,7 @@ export default function DecisionsPage() {
   const isDiscretionary = selectedCatalogEntry?.discretionary || cause === "Other";
 
   return (
-    <div className="max-w-4xl">
+    <div className="max-w-4xl mx-auto">
       <h1 className="text-4xl font-bold mb-2 text-gray-900">Assign Penalty</h1>
       <p className="text-gray-600 mb-8">Issue a new penalty decision and generate the official document</p>
 
@@ -124,135 +124,141 @@ export default function DecisionsPage() {
             />
           </div> */}
           
-          {/* Driver Selection */}
-          <div>
-            <label htmlFor="driver" className="block text-sm font-semibold text-gray-700 mb-2">
-              Driver
-            </label>
-            <select
-              id="driver"
-              value={driverId}
-              onChange={handleDriverChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base bg-white shadow-sm"
-            >
-              <option value="">Select a driver...</option>
-              {drivers.map(d => (
-                <option key={d.id} value={d.id}>
-                  {d.name} ({d.team?.name || "No Team"})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Event Selection */}
-          <div>
-            <label htmlFor="event" className="block text-sm font-semibold text-gray-700 mb-2">
-              Event Type
-            </label>
-            <select
-              id="event"
-              value={event}
-              onChange={handleEventChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base bg-white shadow-sm"
-            >
-              <option value="race">Race</option>
-              <option value="qualifying">Qualifying</option>
-              <option value="training">Training</option>
-            </select>
-          </div>
-
-          {/* Track Name */}
-          <div>
-            <label htmlFor="trackName" className="block text-sm font-semibold text-gray-700 mb-2">
-              Track Name
-              <span className="text-gray-400 font-normal ml-1">(Optional)</span>
-            </label>
-            <input
-              id="trackName"
-              type="text"
-              value={trackName}
-              onChange={(e) => setTrackName(e.target.value)}
-              placeholder="e.g., Monza, Silverstone, Spa-Francorchamps"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base shadow-sm"
-            />
-          </div>
-
-          {/* Cause Selection */}
-          <div>
-            <label htmlFor="cause" className="block text-sm font-semibold text-gray-700 mb-2">
-              Infringement
-            </label>
-            <select
-              id="cause"
-              value={cause}
-              onChange={handleCauseChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base bg-white shadow-sm"
-            >
-              <option value="">Select infringement...</option>
-              {STRAFENKATALOG.map(c => (
-                <option key={c.cause} value={c.cause}>{c.cause}</option>
-              ))}
-              <option value="Other">Other (Discretionary)</option>
-            </select>
-          </div>
-
-          {/* Custom Infringement Text for "Other" */}
-          {cause === "Other" && (
+          {/* Driver, Event, and Track in a single row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Driver Selection */}
             <div>
-              <label htmlFor="customCause" className="block text-sm font-semibold text-gray-700 mb-2">
-                Custom Infringement Description
-              </label>
-              <input
-                id="customCause"
-                type="text"
-                value={customCause}
-                placeholder="e.g., Unsafe release from pit lane"
-                onChange={e => setCustomCause(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base shadow-sm"
-              />
-            </div>
-          )}
-
-          {/* Penalty Information */}
-          {selectedCatalogEntry && !isDiscretionary && (
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-sm font-semibold text-green-800 mb-1">Standard Penalty ({event.charAt(0).toUpperCase() + event.slice(1)})</p>
-              <p className="text-lg font-bold text-green-900">{selectedCatalogEntry.penalty[event]}</p>
-            </div>
-          )}
-
-          {/* Discretionary Penalty Selection/Input */}
-          {isDiscretionary && cause && (
-            <div>
-              <label htmlFor="penalty" className="block text-sm font-semibold text-gray-700 mb-2">
-                <span className="inline-flex items-center gap-2">
-                  Penalty
-                  <span className="px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-700 rounded">
-                    Discretionary
-                  </span>
-                </span>
+              <label htmlFor="driver" className="block text-sm font-semibold text-gray-700 mb-2">
+                Driver
               </label>
               <select
-                id="penaltySelect"
-                value={penalty}
-                onChange={e => setPenalty(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base bg-white shadow-sm mb-2"
+                id="driver"
+                value={driverId}
+                onChange={handleDriverChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base bg-white shadow-sm"
               >
-                <option value="">Select from existing penalties or type custom...</option>
-                {existingPenalties.map(p => (
-                  <option key={p} value={p}>{p}</option>
+                <option value="">Select a driver...</option>
+                {drivers.map(d => (
+                  <option key={d.id} value={d.id}>
+                    {d.name} ({d.team?.name || "No Team"})
+                  </option>
                 ))}
               </select>
+            </div>
+
+            {/* Event Selection */}
+            <div>
+              <label htmlFor="event" className="block text-sm font-semibold text-gray-700 mb-2">
+                Event Type
+              </label>
+              <select
+                id="event"
+                value={event}
+                onChange={handleEventChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base bg-white shadow-sm"
+              >
+                <option value="race">Race</option>
+                <option value="qualifying">Qualifying</option>
+                <option value="training">Training</option>
+              </select>
+            </div>
+
+            {/* Track Name */}
+            <div>
+              <label htmlFor="trackName" className="block text-sm font-semibold text-gray-700 mb-2">
+                Track Name
+                <span className="text-gray-400 font-normal ml-1">(Optional)</span>
+              </label>
               <input
-                id="penalty"
+                id="trackName"
                 type="text"
-                value={penalty}
-                placeholder="Or type a custom penalty (e.g., 5-second time penalty, Warning, Reprimand)"
-                onChange={e => setPenalty(e.target.value)}
+                value={trackName}
+                onChange={(e) => setTrackName(e.target.value)}
+                placeholder="e.g., Monza, Silverstone"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base shadow-sm"
               />
             </div>
-          )}
+          </div>
+
+          {/* Infringement and Penalty in a single row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Cause Selection */}
+            <div>
+              <label htmlFor="cause" className="block text-sm font-semibold text-gray-700 mb-2">
+                Infringement
+              </label>
+              <select
+                id="cause"
+                value={cause}
+                onChange={handleCauseChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base bg-white shadow-sm"
+              >
+                <option value="">Select infringement...</option>
+                {STRAFENKATALOG.map(c => (
+                  <option key={c.cause} value={c.cause}>{c.cause}</option>
+                ))}
+                <option value="Other">Other (Discretionary)</option>
+              </select>
+
+              {/* Custom Infringement Text for "Other" */}
+              {cause === "Other" && (
+                <div className="mt-4">
+                  <label htmlFor="customCause" className="block text-sm font-semibold text-gray-700 mb-2">
+                    Custom Infringement Description
+                  </label>
+                  <input
+                    id="customCause"
+                    type="text"
+                    value={customCause}
+                    placeholder="e.g., Unsafe release from pit lane"
+                    onChange={e => setCustomCause(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base shadow-sm"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Penalty Information */}
+            {selectedCatalogEntry && !isDiscretionary && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex flex-col justify-center">
+                <p className="text-sm font-semibold text-green-800 mb-1">Standard Penalty ({event.charAt(0).toUpperCase() + event.slice(1)})</p>
+                <p className="text-lg font-bold text-green-900">{selectedCatalogEntry.penalty[event]}</p>
+              </div>
+            )}
+
+            {/* Discretionary Penalty Selection/Input */}
+            {isDiscretionary && cause && (
+              <div>
+                <label htmlFor="penalty" className="block text-sm font-semibold text-gray-700 mb-2">
+                  <span className="inline-flex items-center gap-2">
+                    Penalty
+                    <span className="px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-700 rounded">
+                      Discretionary
+                    </span>
+                  </span>
+                </label>
+                <select
+                  id="penaltySelect"
+                  value={penalty}
+                  onChange={e => setPenalty(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base bg-white shadow-sm mb-2"
+                >
+                  <option value="">Select from existing penalties or type custom...</option>
+                  {existingPenalties.map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+                <input
+                  id="penalty"
+                  type="text"
+                  value={penalty}
+                  placeholder="Or type a custom penalty (e.g., 5-second time penalty)"
+                  onChange={e => setPenalty(e.target.value)}
+                  className="md:mt-9 w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base shadow-sm"
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Submit Button */}

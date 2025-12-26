@@ -1,58 +1,105 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import STRAFENKATALOG from "@/lib/strafenkatalog";
 
 export default function Home() {
-  const [penalties, setPenalties] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [drivers, setDrivers] = useState([]);
+  const [driverId, setDriverId] = useState("");
+  const [cause, setCause] = useState("");
+  const [customCause, setCustomCause] = useState("");
+  const [penalty, setPenalty] = useState("");
+  const [event, setEvent] = useState("race");
+  const [trackName, setTrackName] = useState("");
+  const [competitionName, setCompetitionName] = useState("");
+  const [selectedDriver, setSelectedDriver] = useState(null);
+  const [selectedCatalogEntry, setSelectedCatalogEntry] = useState(null);
+  const [existingPenalties, setExistingPenalties] = useState([]);
 
   useEffect(() => {
-    loadPenalties();
+    fetch("/api/drivers").then(r => r.json()).then(setDrivers);
+    fetch("/api/penalties").then(r => r.json()).then(data => {
+      // Get penalties from STRAFENKATALOG - extract from all events
+      const catalogPenalties = STRAFENKATALOG.flatMap(c => [
+        c.penalty.training,
+        c.penalty.qualifying,
+        c.penalty.race
+      ]);
+
+      // Get custom penalties from database (ones not in catalog)
+      const dbPenalties = data.map(p => p.penalty);
+
+      // Combine and deduplicate
+      const allPenalties = [...new Set([...catalogPenalties, ...dbPenalties])];
+
+      // Sort alphabetically
+      allPenalties.sort();
+
+      setExistingPenalties(allPenalties);
+    });
   }, []);
 
-  async function loadPenalties() {
-    try {
-      const data = await fetch("/api/penalties").then(r => r.json());
-      setPenalties(data);
-    } catch (error) {
-      console.error("Error loading penalties:", error);
-    } finally {
-      setLoading(false);
+  const handleDriverChange = (e) => {
+    const id = e.target.value;
+    setDriverId(id);
+    setSelectedDriver(drivers.find(d => d.id === id));
+  };
+
+  const handleCauseChange = (e) => {
+    const selectedCause = e.target.value;
+    setCause(selectedCause);
+    const catalogEntry = STRAFENKATALOG.find(c => c.cause === selectedCause);
+    setSelectedCatalogEntry(catalogEntry);
+    if (catalogEntry && !catalogEntry.discretionary) {
+      setPenalty(catalogEntry.penalty[event]);
+    } else {
+      setPenalty("");
     }
-  }
+  };
 
-  function formatDate(dateString) {
-    return new Date(dateString).toLocaleString();
-  }
-
-  async function generatePDF(penalty) {
-    try {
-      const res = await fetch("/api/decision-pdf", {
-        method: "POST",
-        body: JSON.stringify({
-          Driver: penalty.driver.name,
-          carNumber: penalty.driver.carNumber,
-          Team: penalty.driver.team.name,
-          event: penalty.event,
-          trackName: penalty.trackName,
-          competitionName: penalty.competitionName,
-          Cause: penalty.cause,
-          Penalty: penalty.penalty,
-          discretionary: penalty.discretionary,
-        }),
-      });
-
-      if (res.ok) {
-        const blob = await res.blob();
-        window.open(URL.createObjectURL(blob));
-      } else {
-        throw new Error("Failed to generate PDF");
-      }
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      alert("Failed to generate PDF");
+  const handleEventChange = (e) => {
+    const selectedEvent = e.target.value;
+    setEvent(selectedEvent);
+    // Update penalty if a catalog entry is selected
+    if (selectedCatalogEntry && !selectedCatalogEntry.discretionary) {
+      setPenalty(selectedCatalogEntry.penalty[selectedEvent]);
     }
+  };
+
+  async function submit() {
+    const finalCause = cause === "Other" ? customCause : cause;
+
+    if (!driverId || !finalCause || !penalty) {
+      alert("Please fill in all required fields");
+      return;
+    }
+
+    await fetch("/api/penalties", {
+      method: "POST",
+      body: JSON.stringify({ driverId, cause: finalCause, penalty, event, trackName, competitionName }),
+    });
+
+    const driver = drivers.find(d => d.id === driverId);
+
+    const res = await fetch("/api/decision-pdf", {
+      method: "POST",
+      body: JSON.stringify({
+        Driver: driver.name,
+        carNumber: driver.carNumber,
+        Team: driver.team.name,
+        Cause: finalCause,
+        Penalty: penalty,
+        event: event,
+        trackName: trackName,
+        competitionName: competitionName,
+        discretionary: isDiscretionary,
+      }),
+    });
+
+    window.open(URL.createObjectURL(await res.blob()));
   }
+
+  const isDiscretionary = selectedCatalogEntry?.discretionary || cause === "Other";
 
   const sections = [
     {
@@ -103,26 +150,26 @@ export default function Home() {
 
   return (
     <div>
-      <div className="text-center mb-12">
-        <h1 className="text-5xl font-bold mb-4 text-gray-900">
+      <div className="text-center mb-8">
+        <h3 className="text-2xl font-bold mb-2 text-gray-900">
           Race Decision System
-        </h1>
+        </h3>
         <p className="text-gray-700 text-xl max-w-2xl mx-auto">
           Professional penalty management system for racing championships
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {sections.map(section => (
           <Link
             key={section.href}
             href={section.href}
-            className="group block p-6 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-xl transition-all duration-200 hover:-translate-y-1"
+            className="group block p-4 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-xl transition-all duration-200 hover:-translate-y-1"
           >
-            <div className={`w-14 h-14 bg-gradient-to-br ${section.gradient} rounded-xl mb-4 flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform duration-200`}>
+            <div className={`w-10 h-10 bg-gradient-to-br ${section.gradient} rounded-xl mb-4 flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform duration-200`}>
               {section.icon}
             </div>
-            <h2 className="text-xl font-semibold mb-2 text-gray-900 group-hover:text-blue-600 transition-colors">
+            <h2 className="text-sm font-semibold mb-1 text-gray-900 group-hover:text-blue-600 transition-colors">
               {section.title}
             </h2>
             <p className="text-gray-600 text-sm leading-relaxed">{section.description}</p>
@@ -136,174 +183,185 @@ export default function Home() {
         ))}
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="p-8 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
-          <h2 className="text-2xl font-semibold mb-4 text-gray-900">Quick Start Guide</h2>
-          <ol className="space-y-3 text-gray-700">
-            <li className="flex items-start gap-3">
-              <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">1</span>
-              <span>Add racing teams in the <strong>Teams</strong> section</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">2</span>
-              <span>Register drivers and assign them to teams in <strong>Drivers</strong></span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">3</span>
-              <span>Issue penalty decisions in the <strong>Decisions</strong> section</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">4</span>
-              <span>Review all penalties in the <strong>Penalties</strong> history</span>
-            </li>
-          </ol>
-        </div>
+      {/* Create Decision Form */}
+      <div className="max-w-4xl mx-auto mt-12">
+        <div className="bg-white rounded-lg shadow-md border border-gray-200 p-8 mb-6">
+      
+          <h3 className="text-center text-2xl font-bold mb-2 text-gray-900">Assign Penalty</h3>
+          <p className="text-center text-gray-600 mb-8">Issue a new penalty decision and generate the official document</p>
 
-        <div className="p-8 bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-xl">
-          <h2 className="text-2xl font-semibold mb-4 text-gray-900">Features</h2>
-          <ul className="space-y-3 text-gray-700">
-            <li className="flex items-start gap-3">
-              <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              <span>Automated penalty catalog with standard decisions</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              <span>Discretionary penalty options for unique cases</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              <span>PDF document generation for official records</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              <span>Complete history tracking of all decisions</span>
-            </li>
-          </ul>
-        </div>
-      </div>
-
-      {/* Recent Penalties Section */}
-      <div className="mt-12">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-3xl font-bold text-gray-900">Recent Penalties</h2>
-            <p className="text-gray-600 mt-1">Quick access to penalty decisions with PDF generation</p>
-          </div>
-          {penalties.length > 0 && (
-            <Link
-              href="/penalties"
-              className="text-blue-600 hover:text-blue-700 font-medium text-sm flex items-center gap-1"
-            >
-              View All
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-          )}
-        </div>
-
-        {loading ? (
-          <div className="text-center py-12 bg-white border border-gray-200 rounded-lg">
-            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
-            <p className="mt-4 text-gray-600">Loading penalties...</p>
-          </div>
-        ) : penalties.length === 0 ? (
-          <div className="text-center py-12 bg-white border border-gray-200 rounded-lg">
-            <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <h3 className="text-lg font-medium text-gray-900 mb-1">No penalties recorded yet</h3>
-            <p className="text-gray-500 mb-4">Start by issuing your first penalty decision</p>
-            <Link
-              href="/decisions"
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Issue Penalty
-            </Link>
-          </div>
-        ) : (
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date & Time</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Driver</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Team</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Event</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Track</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Infringement</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Penalty</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Type</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {penalties.map(penalty => (
-                    <tr key={penalty.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {formatDate(penalty.createdAt)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-semibold text-gray-900">{penalty.driver.name}</div>
-                        {penalty.driver.carNumber && (
-                          <div className="text-xs text-gray-500">#{penalty.driver.carNumber}</div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {penalty.driver.team.name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                          penalty.event === 'race' ? 'bg-red-100 text-red-800 border border-red-200' :
-                          penalty.event === 'qualifying' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
-                          'bg-green-100 text-green-800 border border-green-200'
-                        }`}>
-                          {penalty.event.charAt(0).toUpperCase() + penalty.event.slice(1)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {penalty.trackName || '-'}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
-                        {penalty.cause}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                        {penalty.penalty}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                          penalty.discretionary
-                            ? 'bg-orange-100 text-orange-800 border border-orange-200'
-                            : 'bg-green-100 text-green-800 border border-green-200'
-                        }`}>
-                          {penalty.discretionary ? 'Discretionary' : 'Standard'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <button
-                          onClick={() => generatePDF(penalty)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          PDF
-                        </button>
-                      </td>
-                    </tr>
+          <div className="space-y-6">
+            {/* Driver, Event, and Track in a single row */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Driver Selection */}
+              <div>
+                <label htmlFor="driver" className="block text-sm font-semibold text-gray-700 mb-2">
+                  Driver
+                </label>
+                <select
+                  id="driver"
+                  value={driverId}
+                  onChange={handleDriverChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base bg-white shadow-sm"
+                >
+                  <option value="">Select a driver...</option>
+                  {drivers.map(d => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} ({d.team?.name || "No Team"})
+                    </option>
                   ))}
-                </tbody>
-              </table>
+                </select>
+              </div>
+
+              {/* Event Selection */}
+              <div>
+                <label htmlFor="event" className="block text-sm font-semibold text-gray-700 mb-2">
+                  Event Type
+                </label>
+                <select
+                  id="event"
+                  value={event}
+                  onChange={handleEventChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base bg-white shadow-sm"
+                >
+                  <option value="race">Race</option>
+                  <option value="qualifying">Qualifying</option>
+                  <option value="training">Training</option>
+                </select>
+              </div>
+
+              {/* Track Name */}
+              <div>
+                <label htmlFor="trackName" className="block text-sm font-semibold text-gray-700 mb-2">
+                  Track Name
+                  <span className="text-gray-400 font-normal ml-1">(Optional)</span>
+                </label>
+                <input
+                  id="trackName"
+                  type="text"
+                  value={trackName}
+                  onChange={(e) => setTrackName(e.target.value)}
+                  placeholder="e.g., Monza, Silverstone"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base shadow-sm"
+                />
+              </div>
             </div>
+
+            {/* Infringement and Penalty in a single row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Cause Selection */}
+              <div>
+                <label htmlFor="cause" className="block text-sm font-semibold text-gray-700 mb-2">
+                  Infringement
+                </label>
+                <select
+                  id="cause"
+                  value={cause}
+                  onChange={handleCauseChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base bg-white shadow-sm"
+                >
+                  <option value="">Select infringement...</option>
+                  {STRAFENKATALOG.map(c => (
+                    <option key={c.cause} value={c.cause}>{c.cause}</option>
+                  ))}
+                  <option value="Other">Other (Discretionary)</option>
+                </select>
+
+                {/* Custom Infringement Text for "Other" */}
+                {cause === "Other" && (
+                  <div className="mt-4">
+                    <label htmlFor="customCause" className="block text-sm font-semibold text-gray-700 mb-2">
+                      Custom Infringement Description
+                    </label>
+                    <input
+                      id="customCause"
+                      type="text"
+                      value={customCause}
+                      placeholder="e.g., Unsafe release from pit lane"
+                      onChange={e => setCustomCause(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base shadow-sm"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Penalty Information */}
+              {selectedCatalogEntry && !isDiscretionary && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex flex-col justify-center">
+                  <p className="text-sm font-semibold text-green-800 mb-1">Standard Penalty ({event.charAt(0).toUpperCase() + event.slice(1)})</p>
+                  <p className="text-lg font-bold text-green-900">{selectedCatalogEntry.penalty[event]}</p>
+                </div>
+              )}
+
+              {/* Discretionary Penalty Selection/Input */}
+              {isDiscretionary && cause && (
+                <div>
+                  <label htmlFor="penalty" className="block text-sm font-semibold text-gray-700 mb-2">
+                    <span className="inline-flex items-center gap-2">
+                      Penalty
+                      <span className="px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-700 rounded">
+                        Discretionary
+                      </span>
+                    </span>
+                  </label>
+                  <select
+                    id="penaltySelect"
+                    value={penalty}
+                    onChange={e => setPenalty(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base bg-white shadow-sm mb-2"
+                  >
+                    <option value="">Select from existing penalties or type custom...</option>
+                    {existingPenalties.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                  <input
+                    id="penalty"
+                    type="text"
+                    value={penalty}
+                    placeholder="Or type a custom penalty (e.g., 5-second time penalty)"
+                    onChange={e => setPenalty(e.target.value)}
+                    className="md:mt-9 w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base shadow-sm"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Submit Button */}
+          <div className="mt-8 pt-6 border-t border-gray-200">
+            <button
+              onClick={submit}
+              disabled={!driverId || !cause || !penalty}
+              className="w-full sm:w-auto px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors shadow-sm"
+            >
+              Generate Decision Document (PDF)
+            </button>
+          </div>
+        </div>
+
+        {/* Preview Card */}
+        {selectedDriver && cause && penalty && (cause !== "Other" || customCause) && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Decision Preview</h2>
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <dt className="text-sm font-medium text-gray-600">Driver</dt>
+                <dd className="mt-1 text-base font-semibold text-gray-900">{selectedDriver.name}</dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-600">Team</dt>
+                <dd className="mt-1 text-base font-semibold text-gray-900">{selectedDriver.team?.name || "No Team"}</dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-600">Infringement</dt>
+                <dd className="mt-1 text-base font-semibold text-gray-900">{cause === "Other" ? customCause : cause}</dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-600">Penalty</dt>
+                <dd className="mt-1 text-base font-semibold text-gray-900">{penalty}</dd>
+              </div>
+            </dl>
           </div>
         )}
       </div>
